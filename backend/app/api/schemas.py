@@ -106,6 +106,7 @@ class GenerateResponse(BaseModel):
     generated: int
     total: int
     ai_enabled: bool
+    quota_exceeded: bool = False
 
 
 class AchievementOut(BaseModel):

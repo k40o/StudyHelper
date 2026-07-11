@@ -579,7 +579,10 @@ function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
   >([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [genId, setGenId] = useState<number | null>(null);
+  // A Set (not a single id) so generating several documents at once doesn't
+  // have one request's completion clear the "in progress" state of another.
+  const [genIds, setGenIds] = useState<Set<number>>(new Set());
+  const [genResults, setGenResults] = useState<{ id: number; title: string; ok: boolean; detail: string }[]>([]);
 
   async function onDelete(doc: Doc) {
     if (!window.confirm(`Delete "${doc.title}"? The file is moved to a trash folder.`)) return;
@@ -597,16 +600,36 @@ function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
   }
 
   async function onGenerate(doc: Doc) {
-    setGenId(doc.id);
-    setMsg(`Generating questions from "${doc.title}"… this can take a minute.`);
+    setGenIds((prev) => new Set(prev).add(doc.id));
     try {
       const r = await api.generate(doc.id, 20);
-      setMsg(`Generated ${r.generated} new question(s) — ${r.total} total for "${doc.title}".`);
+      const detail = r.quota_exceeded
+        ? `+${r.generated} new (stopped — Gemini quota exceeded, try again later)`
+        : `+${r.generated} new · ${r.total} total`;
+      setGenResults((prev) => [
+        ...prev.filter((x) => x.id !== doc.id),
+        { id: doc.id, title: doc.title, ok: !r.quota_exceeded, detail },
+      ]);
       onChange();
     } catch (e) {
-      setMsg(`Error: ${(e as Error).message}`);
+      setGenResults((prev) => [
+        ...prev.filter((x) => x.id !== doc.id),
+        { id: doc.id, title: doc.title, ok: false, detail: (e as Error).message },
+      ]);
     } finally {
-      setGenId(null);
+      setGenIds((prev) => {
+        const next = new Set(prev);
+        next.delete(doc.id);
+        return next;
+      });
+    }
+  }
+
+  function onGenerateAll() {
+    // Fire every document's generation concurrently instead of one at a time —
+    // each tracks its own progress/result independently (see genIds/genResults).
+    for (const doc of docs) {
+      if (!genIds.has(doc.id)) onGenerate(doc);
     }
   }
 
@@ -676,8 +699,30 @@ function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
         </ul>
       )}
       {warnMsg && <div className="notice warn">{warnMsg}</div>}
+      {genResults.length > 0 && (
+        <ul className="upload-results">
+          {genResults.map((r) => (
+            <li key={r.id} className={r.ok ? "ok" : "bad"}>
+              <span className="upload-result-icon">{r.ok ? "✓" : "✗"}</span>
+              <span className="upload-result-name">{r.title}</span>
+              <span className="upload-result-detail">{r.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      <h2 className="section-title">Your Library ({docs.length})</h2>
+      <div className="section-head">
+        <h2 className="section-title">Your Library ({docs.length})</h2>
+        {docs.length > 1 && (
+          <button
+            className="btn small ghost"
+            onClick={onGenerateAll}
+            disabled={docs.every((d) => genIds.has(d.id))}
+          >
+            ✨ Generate for all
+          </button>
+        )}
+      </div>
       {docs.length === 0 ? (
         <p className="empty">No documents yet — add some notes above to get started.</p>
       ) : (
@@ -695,10 +740,10 @@ function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
               <button
                 className="gen-btn"
                 title="Generate questions"
-                disabled={genId === d.id}
+                disabled={genIds.has(d.id)}
                 onClick={() => onGenerate(d)}
               >
-                {genId === d.id ? "…" : d.questions ? "＋ More" : "✨ Generate"}
+                {genIds.has(d.id) ? "…" : d.questions ? "＋ More" : "✨ Generate"}
               </button>
               <button
                 className="delete-btn"

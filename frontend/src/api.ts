@@ -199,7 +199,7 @@ export const api = {
   completeBoss: (docId: number) =>
     json<BossComplete>(`/api/bosses/${docId}/complete`, { method: "POST" }),
   generate: (docId: number, maxQuestions = 20) =>
-    json<{ generated: number; total: number; ai_enabled: boolean }>(
+    json<{ generated: number; total: number; ai_enabled: boolean; quota_exceeded: boolean }>(
       `/api/documents/${docId}/generate`,
       { method: "POST", body: JSON.stringify({ max_questions: maxQuestions }) }
     ),

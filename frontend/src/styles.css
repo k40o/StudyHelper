@@ -231,6 +231,15 @@ h2 {
   letter-spacing: 0.7px;
   font-weight: 700;
 }
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-head .section-title {
+  margin: 22px 0 12px 0;
+}
 
 /* ------------------------------ Buttons ---------------------------- */
 .btn {

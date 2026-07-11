@@ -13,7 +13,7 @@ import time
 import requests
 
 from ...core.config import AISettings, load_ai_settings
-from .base import AIError, AIProvider
+from .base import AIError, AIProvider, QuotaExceededError
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +115,13 @@ class GeminiProvider(AIProvider):
 
             if resp.status_code == 200:
                 return resp.json()
+
+            if resp.status_code == 429 and _is_quota_exhausted(resp):
+                # A hard quota exhaustion (daily/monthly cap, not a short-lived
+                # rate limit) won't clear up within a backoff window — retrying
+                # just wastes time on a call that's guaranteed to fail again.
+                raise QuotaExceededError(f"Gemini API quota exceeded: {resp.text[:300]}")
+
             if resp.status_code in _RETRYABLE and attempt < self._max_retries - 1:
                 logger.warning("Gemini %s -> %s, retrying", path, resp.status_code)
                 self._sleep(attempt)
@@ -126,6 +133,16 @@ class GeminiProvider(AIProvider):
     @staticmethod
     def _sleep(attempt: int) -> None:
         time.sleep(min(2 ** attempt, 8))  # 1, 2, 4, 8s
+
+
+def _is_quota_exhausted(resp) -> bool:
+    """Distinguish a hard quota cap from a short-lived per-request rate limit.
+    Gemini reports both as HTTP 429, but only ``RESOURCE_EXHAUSTED`` means
+    retrying won't help within this run."""
+    try:
+        return resp.json().get("error", {}).get("status") == "RESOURCE_EXHAUSTED"
+    except ValueError:
+        return False
 
 
 def _l2_normalize(vec: list[float]) -> list[float]:

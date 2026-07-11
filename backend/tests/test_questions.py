@@ -14,7 +14,7 @@ from app.domain.document import (
     SourceType,
 )
 from app.domain.question import Difficulty, Question, QuestionType
-from app.infrastructure.ai import AIProvider
+from app.infrastructure.ai import AIProvider, QuotaExceededError
 from app.infrastructure.persistence import Database, DocumentRecord, QuestionRepository
 from conftest import create_test_user
 
@@ -112,8 +112,10 @@ SLIDE2_JSON = json.dumps(
 def test_generate_for_document_normalizes_all_types():
     provider = QueuedProvider([SLIDE1_JSON, SLIDE2_JSON])
     gen = QuestionGenerator(provider)
-    questions = gen.generate_for_document(_two_slide_doc(), document_id=1)
+    batch = gen.generate_for_document(_two_slide_doc(), document_id=1)
+    questions = batch.questions
 
+    assert batch.quota_exceeded is False
     by_type = {q.question_type: q for q in questions}
     assert len(questions) == 5
 
@@ -137,9 +139,27 @@ def test_generation_dedupes_identical_prompts():
     # Both chunks return the SAME question -> stored once.
     provider = QueuedProvider([SLIDE1_JSON, SLIDE1_JSON])
     gen = QuestionGenerator(provider)
-    questions = gen.generate_for_document(_two_slide_doc(), document_id=1)
+    questions = gen.generate_for_document(_two_slide_doc(), document_id=1).questions
     prompts = [q.prompt for q in questions]
     assert len(prompts) == len(set(prompts))  # no duplicates
+
+
+def test_generation_stops_early_on_quota_exceeded():
+    class QuotaExceededProvider(AIProvider):
+        @property
+        def embedding_dim(self) -> int:
+            return 8
+
+        def generate(self, prompt, *, system=None, temperature=0.7, max_output_tokens=None, json_mode=False):
+            raise QuotaExceededError("quota exceeded")
+
+        def embed(self, text, *, task_type="RETRIEVAL_DOCUMENT"):
+            return [0.0] * 8
+
+    gen = QuestionGenerator(QuotaExceededProvider())
+    batch = gen.generate_for_document(_two_slide_doc(), document_id=1)
+    assert batch.quota_exceeded is True
+    assert batch.questions == []  # stopped before the first chunk produced anything
 
 
 def test_parse_lenient_handles_code_fence():

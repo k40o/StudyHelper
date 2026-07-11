@@ -175,17 +175,19 @@ class LibraryService:
                 "generated": 0,
                 "total": self.question_count(user_id, document_id),
                 "ai_enabled": False,
+                "quota_exceeded": False,
             }
 
-        questions = self._generator.generate_for_document(
+        batch = self._generator.generate_for_document(
             doc, document_id, per_chunk=per_chunk, max_questions=max_questions
         )
         with self._db.unit_of_work() as session:
-            stored = QuestionRepository(session).add_many(questions)
+            stored = QuestionRepository(session).add_many(batch.questions)
         return {
             "generated": stored,
             "total": self.question_count(user_id, document_id),
             "ai_enabled": True,
+            "quota_exceeded": batch.quota_exceeded,
         }
 
     def list_questions(self, document_id: int, user_id: int) -> list[dict]:

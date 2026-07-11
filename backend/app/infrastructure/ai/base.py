@@ -13,6 +13,13 @@ class AIError(Exception):
     """Raised for any provider-level failure (network, quota, bad response)."""
 
 
+class QuotaExceededError(AIError):
+    """The account has run out of API quota. Unlike a transient rate limit,
+    retrying within seconds won't help — callers doing bulk work (e.g.
+    per-chunk question generation) should stop entirely rather than retry
+    every remaining call and wait through certain repeated failures."""
+
+
 class AIProvider(ABC):
     @property
     @abstractmethod

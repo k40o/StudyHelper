@@ -4,7 +4,7 @@ from .chunking import Chunk, chunk_document
 from .game_service import GameService
 from .ingestion_service import IngestionService, IngestResult, IngestStatus
 from .library_service import LibraryService
-from .question_generator import QuestionGenerator
+from .question_generator import GenerationBatch, QuestionGenerator
 from .rag_service import RagService
 from .tutor_service import Source, TutorAnswer, TutorService
 
@@ -20,6 +20,7 @@ __all__ = [
     "Source",
     "LibraryService",
     "QuestionGenerator",
+    "GenerationBatch",
     "GameService",
     "AuthService",
     "AuthError",

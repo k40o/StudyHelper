@@ -9,13 +9,20 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass, field
 
 from ..domain.document import ParsedDocument
 from ..domain.question import Difficulty, Question, QuestionType
-from ..infrastructure.ai import AIError, AIProvider
+from ..infrastructure.ai import AIError, AIProvider, QuotaExceededError
 from .chunking import Chunk, chunk_document
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GenerationBatch:
+    questions: list[Question] = field(default_factory=list)
+    quota_exceeded: bool = False
 
 DEFAULT_TYPES: tuple[QuestionType, ...] = (
     QuestionType.MULTIPLE_CHOICE,
@@ -64,7 +71,7 @@ class QuestionGenerator:
         per_chunk: int = 3,
         max_questions: int = 30,
         max_chunks: int | None = None,
-    ) -> list[Question]:
+    ) -> GenerationBatch:
         chunks = chunk_document(doc)
         if max_chunks is not None:
             chunks = chunks[:max_chunks]
@@ -82,6 +89,12 @@ class QuestionGenerator:
             offset += per_chunk
             try:
                 generated = self._generate_for_chunk(chunk.text, targets, per_chunk)
+            except QuotaExceededError as exc:
+                # A hard quota cap won't clear up mid-run — stop immediately
+                # instead of burning a retry-with-backoff on every remaining
+                # chunk for calls that are guaranteed to fail the same way.
+                logger.warning("Stopping generation early: %s", exc)
+                return GenerationBatch(questions=results, quota_exceeded=True)
             except AIError as exc:
                 logger.warning("Question generation failed for a chunk: %s", exc)
                 continue
@@ -97,7 +110,7 @@ class QuestionGenerator:
                     if len(results) >= max_questions:
                         break
         logger.info("Generated %d questions for document %s", len(results), document_id)
-        return results
+        return GenerationBatch(questions=results)
 
     def _generate_for_chunk(
         self, text: str, types: tuple[QuestionType, ...], count: int
