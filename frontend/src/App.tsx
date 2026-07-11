@@ -574,6 +574,9 @@ function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [warnMsg, setWarnMsg] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [uploadResults, setUploadResults] = useState<
+    { name: string; ok: boolean; detail: string }[]
+  >([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [genId, setGenId] = useState<number | null>(null);
@@ -609,22 +612,32 @@ function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
 
   async function onFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
+    const queue = Array.from(files);
     setBusy(true);
     setMsg(null);
     setWarnMsg(null);
-    try {
-      for (const file of Array.from(files)) {
+    setUploadResults([]);
+
+    for (let i = 0; i < queue.length; i++) {
+      const file = queue[i];
+      setMsg(queue.length > 1 ? `Uploading ${i + 1}/${queue.length}: ${file.name}…` : `Uploading ${file.name}…`);
+      try {
         const r = await api.upload(file);
-        setMsg(`${file.name}: ${r.status}${r.blocks ? ` (${r.blocks} blocks)` : ""}`);
+        setUploadResults((prev) => [
+          ...prev,
+          { name: file.name, ok: true, detail: `${r.status}${r.blocks ? ` · ${r.blocks} blocks` : ""}` },
+        ]);
         if (r.warning) setWarnMsg(r.warning);
+      } catch (e) {
+        // Keep going so one bad file in a multi-drop doesn't block the rest.
+        setUploadResults((prev) => [...prev, { name: file.name, ok: false, detail: (e as Error).message }]);
       }
-      onChange();
-    } catch (e) {
-      setMsg(`Error: ${(e as Error).message}`);
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
+
+    setMsg(null);
+    onChange();
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   return (
@@ -640,7 +653,7 @@ function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
       >
         <div className="dropzone-icon">⬆️</div>
         <div className="dropzone-title">{busy ? "Importing…" : "Add study materials"}</div>
-        <div className="dropzone-sub">Drop or click · .docx .pptx .pdf .txt</div>
+        <div className="dropzone-sub">Drop one or many files, or click · .docx .pptx .pdf .txt</div>
         <input
           ref={fileRef}
           type="file"
@@ -651,6 +664,17 @@ function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
         />
       </div>
       {msg && <div className="notice">{msg}</div>}
+      {uploadResults.length > 0 && (
+        <ul className="upload-results">
+          {uploadResults.map((r, i) => (
+            <li key={i} className={r.ok ? "ok" : "bad"}>
+              <span className="upload-result-icon">{r.ok ? "✓" : "✗"}</span>
+              <span className="upload-result-name">{r.name}</span>
+              <span className="upload-result-detail">{r.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {warnMsg && <div className="notice warn">{warnMsg}</div>}
 
       <h2 className="section-title">Your Library ({docs.length})</h2>
