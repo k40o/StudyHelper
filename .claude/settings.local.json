@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(../.venv/Scripts/python.exe -m pip install --quiet \"sqlalchemy>=2.0\" \"watchdog>=4.0\")",
+      "Bash(../.venv/Scripts/python.exe -c \"import sqlalchemy, watchdog; print\\('sqlalchemy', sqlalchemy.__version__\\); print\\('watchdog', watchdog.__version__\\)\")",
+      "Bash(../.venv/Scripts/python.exe -c \"from watchdog.observers import Observer; from watchdog.events import FileSystemEventHandler; print\\('watchdog OK'\\)\")",
+      "Bash(../.venv/Scripts/python.exe -m pytest -q)",
+      "Bash(../.venv/Scripts/python.exe -m pip install \"chromadb>=0.5\" requests python-dotenv)",
+      "Bash(../.venv/Scripts/python.exe -c \"import chromadb, requests, dotenv; print\\('chromadb', chromadb.__version__\\); print\\('imports OK'\\)\")",
+      "Bash(../.venv/Scripts/python.exe -m pytest tests/test_rag.py -q)"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "studygame",
+      "runtimeExecutable": "C:/Users/Administrator/Desktop/projects/studygame/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.api.main:app",
+        "--app-dir",
+        "backend",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ],
+      "port": 8000
+    }
+  ]
+}

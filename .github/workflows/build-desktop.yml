@@ -1,0 +1,79 @@
+name: Build desktop app
+
+# PyInstaller and electron-builder both produce native binaries for whichever
+# OS they run on, so this workflow builds Windows/Mac/Linux installers in
+# parallel on GitHub's own runners for each OS — no cross-compilation needed.
+on:
+  push:
+    tags:
+      - "desktop-v*"
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            backend_name: studygame-backend.exe
+          - os: macos-latest
+            backend_name: studygame-backend
+          - os: ubuntu-latest
+            backend_name: studygame-backend
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install backend dependencies
+        run: |
+          pip install -r backend/requirements-deploy.txt
+          pip install pyinstaller
+
+      - name: Build frontend
+        run: |
+          npm ci --prefix frontend
+          npm run build --prefix frontend
+
+      - name: Freeze backend with PyInstaller
+        working-directory: backend
+        run: >
+          pyinstaller --name studygame-backend --onedir --noconfirm --clean
+          --hidden-import uvicorn.loops.auto
+          --hidden-import uvicorn.protocols.http.auto
+          --hidden-import uvicorn.protocols.websockets.auto
+          --hidden-import uvicorn.lifespan.on
+          --collect-all pptx --collect-all docx --collect-all fitz
+          desktop_main.py
+
+      - name: Assemble Electron resources
+        shell: bash
+        run: |
+          mkdir -p electron/resources/backend electron/resources/frontend
+          cp -r backend/dist/studygame-backend/* electron/resources/backend/
+          cp -r frontend/dist/* electron/resources/frontend/
+
+      - name: Install Electron dependencies
+        working-directory: electron
+        run: npm install
+
+      - name: Build installer
+        working-directory: electron
+        run: npx electron-builder --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: study-helper-${{ matrix.os }}
+          path: |
+            electron/release/*.exe
+            electron/release/*.dmg
+            electron/release/*.AppImage
+          if-no-files-found: warn

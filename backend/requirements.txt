@@ -1,0 +1,21 @@
+# --- Module 1: Document parsing ---
+python-docx>=1.1.2      # Word (.docx)
+python-pptx>=1.0.2      # PowerPoint (.pptx)
+PyMuPDF>=1.24.0         # PDF (fitz)
+
+# --- Module 2: watcher + persistence ---
+sqlalchemy>=2.0.0        # ORM over SQLite
+watchdog>=4.0.0          # folder auto-detection
+
+# --- Module 3: AI + RAG ---
+requests>=2.32.0         # Gemini REST calls
+python-dotenv>=1.0.0     # load backend/.env
+chromadb>=0.5.0          # vector store for RAG
+
+# --- Module 7+: API (installed as we build it) ---
+# fastapi>=0.115.0         # REST API
+# uvicorn[standard]>=0.30  # ASGI server
+# pydantic>=2.9.0          # request/response models
+
+# --- Dev / testing ---
+pytest>=8.3.0

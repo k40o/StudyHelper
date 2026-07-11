@@ -1,0 +1,19 @@
+# Render.com blueprint. Deploy: push this repo to GitHub, then in Render click
+# "New +" -> "Blueprint" and pick the repo. Render reads this file.
+services:
+  - type: web
+    name: study-helper
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # "starter" is required for a persistent disk (keeps your docs & progress).
+    # Use "free" only to try it out — data resets when the service restarts.
+    plan: starter
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # set this secret in the Render dashboard
+      - key: VECTOR_STORE
+        value: simple
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
