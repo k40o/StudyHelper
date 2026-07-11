@@ -2,10 +2,12 @@
 // for it to report healthy, then opens a window pointed at it. In dev mode
 // (no packaged backend present) it spawns the venv's python running
 // desktop_main.py directly, so `npm start` works without a PyInstaller build.
-const { app, BrowserWindow, Menu, shell } = require("electron");
+const { app, BrowserWindow, Menu, shell, ipcMain } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { spawn } = require("child_process");
 const http = require("http");
+const { loadSettings, saveSettings } = require("./settings");
 
 const PORT = 8756;
 const HEALTH_URL = `http://127.0.0.1:${PORT}/healthz`;
@@ -13,14 +15,19 @@ const APP_URL = `http://127.0.0.1:${PORT}/`;
 
 let backendProcess = null;
 let mainWindow = null;
+let setupWindow = null;
 
 function backendEnv() {
+  const settings = loadSettings();
   return {
     ...process.env,
     PORT: String(PORT),
     VECTOR_STORE: "simple",
     STUDYGAME_DATA_DIR: path.join(app.getPath("userData"), "data"),
     STUDYGAME_MATERIALS_DIR: path.join(app.getPath("userData"), "StudyMaterials"),
+    // Empty is fine — the backend just runs with AI features disabled, same
+    // as the web app when no key is configured.
+    GEMINI_API_KEY: settings.geminiApiKey || "",
   };
 }
 
@@ -30,7 +37,6 @@ function startBackend() {
     "backend",
     process.platform === "win32" ? "studygame-backend.exe" : "studygame-backend"
   );
-  const fs = require("fs");
 
   if (fs.existsSync(frozenExe)) {
     backendProcess = spawn(frozenExe, [], { env: backendEnv() });
@@ -53,6 +59,11 @@ function startBackend() {
   backendProcess.on("exit", (code) => console.log(`[backend] exited with code ${code}`));
 }
 
+function stopBackend() {
+  if (backendProcess && !backendProcess.killed) backendProcess.kill();
+  backendProcess = null;
+}
+
 function waitForBackend(retriesLeft = 60) {
   return new Promise((resolve, reject) => {
     const attempt = () => {
@@ -71,6 +82,53 @@ function waitForBackend(retriesLeft = 60) {
   });
 }
 
+// Shown once on first run (no Gemini key saved yet), and again any time the
+// user picks Settings > Gemini API Key from the menu.
+function showSetupWindow() {
+  return new Promise((resolve) => {
+    setupWindow = new BrowserWindow({
+      width: 480,
+      height: 480,
+      resizable: false,
+      icon: path.join(__dirname, "build", "icon.png"),
+      backgroundColor: "#0d1020",
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        preload: path.join(__dirname, "preload.js"),
+      },
+    });
+    setupWindow.setMenu(null);
+    setupWindow.loadFile(path.join(__dirname, "setup.html"));
+    setupWindow.on("closed", () => {
+      setupWindow = null;
+      resolve();
+    });
+  });
+}
+
+function buildMenu() {
+  const template = [
+    {
+      label: "Settings",
+      submenu: [
+        {
+          label: "Gemini API Key…",
+          click: async () => {
+            await showSetupWindow();
+            // Restart the backend so it picks up the (possibly new) key.
+            stopBackend();
+            startBackend();
+            await waitForBackend();
+            mainWindow?.loadURL(APP_URL);
+          },
+        },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -85,8 +143,6 @@ async function createWindow() {
     },
   });
 
-  Menu.setApplicationMenu(null);
-
   // Open any target="_blank" links in the OS browser instead of a new Electron window.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -97,7 +153,18 @@ async function createWindow() {
   mainWindow.loadURL(APP_URL);
 }
 
+ipcMain.handle("settings:get", () => loadSettings());
+ipcMain.handle("settings:save", (_event, partial) => saveSettings(partial));
+ipcMain.handle("settings:open-external", (_event, url) => shell.openExternal(url));
+
 app.whenReady().then(async () => {
+  buildMenu();
+
+  const settings = loadSettings();
+  if (!settings.geminiApiKey) {
+    await showSetupWindow();
+  }
+
   startBackend();
   try {
     await createWindow();
@@ -116,5 +183,5 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  if (backendProcess && !backendProcess.killed) backendProcess.kill();
+  stopBackend();
 });

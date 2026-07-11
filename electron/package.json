@@ -1,6 +1,6 @@
 {
   "name": "study-helper-desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Study Helper desktop app",
   "main": "main.js",
@@ -20,6 +20,9 @@
     },
     "files": [
       "main.js",
+      "preload.js",
+      "settings.js",
+      "setup.html",
       "build/icon.png"
     ],
     "extraResources": [

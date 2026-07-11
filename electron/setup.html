@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Study Helper Setup</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: #0d1020;
+    color: #eef0ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+  .card {
+    width: 420px;
+    padding: 32px;
+    background: #161a2e;
+    border: 1px solid #2a3158;
+    border-radius: 20px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { color: #a2a8cf; font-size: 14px; line-height: 1.5; }
+  a { color: #9d7bff; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 6px; }
+  input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #333a63;
+    background: #1e2440;
+    color: #eef0ff;
+    font-size: 14px;
+  }
+  .row { display: flex; gap: 10px; margin-top: 20px; }
+  button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 12px;
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .save { background: #7c5cff; color: white; }
+  .skip { background: #283056; color: #eef0ff; }
+  .note { font-size: 12px; margin-top: 14px; color: #a2a8cf; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>📖 Welcome to Study Helper</h1>
+    <p>
+      Paste your free Gemini API key to enable AI features (quiz generation, the
+      tutor, and search). Get one at
+      <a href="#" id="key-link">aistudio.google.com/apikey</a>.
+    </p>
+    <label for="key">Gemini API key</label>
+    <input id="key" type="password" placeholder="AQ.Ab8..." autofocus />
+    <div class="row">
+      <button class="skip" id="skip">Skip for now</button>
+      <button class="save" id="save">Save &amp; continue</button>
+    </div>
+    <p class="note">You can add or change this later from the Settings menu.</p>
+  </div>
+  <script>
+    document.getElementById("key-link").addEventListener("click", (e) => {
+      e.preventDefault();
+      window.settingsAPI.openExternal?.("https://aistudio.google.com/apikey");
+    });
+    document.getElementById("save").addEventListener("click", async () => {
+      const key = document.getElementById("key").value.trim();
+      await window.settingsAPI.saveSettings({ geminiApiKey: key });
+    });
+    document.getElementById("skip").addEventListener("click", async () => {
+      await window.settingsAPI.saveSettings({ geminiApiKey: "" });
+    });
+  </script>
+</body>
+</html>
