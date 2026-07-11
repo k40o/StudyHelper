@@ -127,6 +127,7 @@ async def upload_document(
         title=result.title,
         blocks=result.blocks,
         error=result.error,
+        warning=result.warning,
     )
 
 

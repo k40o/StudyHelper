@@ -11,7 +11,12 @@ from dataclasses import dataclass
 from ..domain.document import ParsedDocument
 
 DEFAULT_MAX_CHARS = 900
-DEFAULT_MIN_CHARS = 150
+# Deliberately small: this only needs to catch genuinely degenerate sections
+# (a stray page number, a one-word caption) so a scanned PDF's near-empty
+# "pages" merge into something with real content. It must stay well below a
+# normal short slide bullet (often 30-80 chars) or citations get coarser than
+# they need to be for perfectly good, just-terse source material.
+DEFAULT_MIN_CHARS = 20
 
 
 @dataclass
@@ -64,8 +69,11 @@ def chunk_document(
         if block.is_heading:
             # A new heading starts a new section — but only break if the current
             # buffer already has real content (avoids lone heading-only chunks
-            # when headings stack, e.g. a title immediately followed by a subtitle).
-            if has_body:
+            # when headings stack, e.g. a title immediately followed by a subtitle)
+            # AND has reached min_chars (avoids a flood of tiny, low-signal chunks
+            # — e.g. a scanned PDF where each "section" is just a page number or
+            # caption — that starve the AI of enough passage text to work with).
+            if has_body and buf_len >= min_chars:
                 flush()
             current_heading = block.text
 
@@ -83,5 +91,4 @@ def chunk_document(
             flush()
 
     flush()
-    _ = min_chars  # reserved for future tuning; retained for API stability
     return chunks

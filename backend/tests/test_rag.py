@@ -58,6 +58,51 @@ def test_chunking_preserves_heading_and_location():
     assert photo.slide == 2
 
 
+def test_chunking_merges_sections_below_min_chars():
+    # Each "page" has a short heading + a one-word caption — like a scanned PDF
+    # where a chapter title is real text but the body is an image with no OCR.
+    # Without enforcing min_chars, each heading forces its own near-empty chunk
+    # that starves the AI of real passage text; with it, tiny sections merge
+    # until there's enough to work with.
+    doc = ParsedDocument(
+        file_path="/study/scanned.pdf",
+        source_type=SourceType.PDF,
+        title="Scanned Book",
+        blocks=[
+            ContentBlock("Page 1", BlockType.HEADING, location=SourceLocation(page=1)),
+            ContentBlock("fig.", BlockType.PARAGRAPH, location=SourceLocation(page=1)),
+            ContentBlock("Page 2", BlockType.HEADING, location=SourceLocation(page=2)),
+            ContentBlock("fig.", BlockType.PARAGRAPH, location=SourceLocation(page=2)),
+            ContentBlock("Page 3", BlockType.HEADING, location=SourceLocation(page=3)),
+            ContentBlock("fig.", BlockType.PARAGRAPH, location=SourceLocation(page=3)),
+        ],
+    )
+    chunks = chunk_document(doc, max_chars=900, min_chars=150)
+    assert len(chunks) == 1  # merged into one chunk instead of three tiny ones
+
+
+def test_chunking_still_splits_once_min_chars_reached():
+    # Same shape, but each section is long enough on its own — should split
+    # normally at each heading rather than merging everything.
+    long_a = "A" * 200
+    long_b = "B" * 200
+    doc = ParsedDocument(
+        file_path="/study/normal.pdf",
+        source_type=SourceType.PDF,
+        title="Normal Book",
+        blocks=[
+            ContentBlock("Section One", BlockType.HEADING, location=SourceLocation(page=1)),
+            ContentBlock(long_a, BlockType.PARAGRAPH, location=SourceLocation(page=1)),
+            ContentBlock("Section Two", BlockType.HEADING, location=SourceLocation(page=2)),
+            ContentBlock(long_b, BlockType.PARAGRAPH, location=SourceLocation(page=2)),
+        ],
+    )
+    chunks = chunk_document(doc, max_chars=900, min_chars=150)
+    assert len(chunks) == 2
+    assert chunks[0].heading == "Section One"
+    assert chunks[1].heading == "Section Two"
+
+
 # --------------------------------------------------------------------------- #
 # RAG retrieval
 # --------------------------------------------------------------------------- #

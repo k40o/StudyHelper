@@ -45,12 +45,17 @@ class PdfParser(DocumentParser):
             doc.close()
 
         first_heading = next((b.text for b in blocks if b.is_heading), None)
+        total_chars = sum(len(b.text) for b in blocks)
+        # A normal text-based PDF has hundreds of characters per page; a
+        # scanned/image-only PDF (no OCR here) yields almost nothing — just
+        # stray header/footer/page-number text PyMuPDF happens to find.
+        low_text = page_count > 0 and (total_chars / page_count) < 30
         return ParsedDocument(
             file_path=str(path),
             source_type=SourceType.PDF,
             title=pdf_title or derive_title(path, first_heading),
             blocks=blocks,
-            metadata={"page_count": page_count},
+            metadata={"page_count": page_count, "low_text_warning": low_text},
         )
 
     @staticmethod

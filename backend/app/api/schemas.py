@@ -46,6 +46,7 @@ class ImportResult(BaseModel):
     title: str | None = None
     blocks: int = 0
     error: str | None = None
+    warning: str | None = None
 
 
 class AskRequest(BaseModel):

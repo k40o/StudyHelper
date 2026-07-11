@@ -139,6 +139,7 @@ def test_pdf_parsing(service, tmp_path):
     doc = service.parse(_make_pdf(tmp_path))
     assert doc.source_type == SourceType.PDF
     assert doc.metadata["page_count"] == 2
+    assert doc.metadata["low_text_warning"] is False
 
     # The big-font titles should be detected as headings via font-size heuristic.
     heading_texts = [b.text for b in doc.headings]
@@ -148,6 +149,23 @@ def test_pdf_parsing(service, tmp_path):
     # Page numbers preserved.
     stalingrad = next(b for b in doc.blocks if "Stalingrad" in b.text)
     assert stalingrad.location.page == 2
+
+
+def test_pdf_scanned_flagged_low_text(service, tmp_path):
+    # A "scanned" PDF: pages with no real text layer, just a stray page number
+    # (mimics what PyMuPDF extracts from an image-only page with no OCR).
+    import fitz
+
+    doc = fitz.open()
+    for n in range(1, 6):
+        page = doc.new_page()
+        page.insert_text((550, 800), str(n), fontsize=8)
+    path = tmp_path / "scanned.pdf"
+    doc.save(str(path))
+    doc.close()
+
+    parsed = service.parse(path)
+    assert parsed.metadata["low_text_warning"] is True
 
 
 def test_unsupported_format(service, tmp_path):

@@ -572,6 +572,7 @@ function BossBattle({
 function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [warnMsg, setWarnMsg] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -610,10 +611,12 @@ function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
     if (!files || files.length === 0) return;
     setBusy(true);
     setMsg(null);
+    setWarnMsg(null);
     try {
       for (const file of Array.from(files)) {
         const r = await api.upload(file);
         setMsg(`${file.name}: ${r.status}${r.blocks ? ` (${r.blocks} blocks)` : ""}`);
+        if (r.warning) setWarnMsg(r.warning);
       }
       onChange();
     } catch (e) {
@@ -648,6 +651,7 @@ function Library({ docs, onChange }: { docs: Doc[]; onChange: () => void }) {
         />
       </div>
       {msg && <div className="notice">{msg}</div>}
+      {warnMsg && <div className="notice warn">{warnMsg}</div>}
 
       <h2 className="section-title">Your Library ({docs.length})</h2>
       {docs.length === 0 ? (

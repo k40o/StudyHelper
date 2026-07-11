@@ -67,6 +67,7 @@ export interface ImportResult {
   title: string | null;
   blocks: number;
   error: string | null;
+  warning: string | null;
 }
 
 export interface Source {

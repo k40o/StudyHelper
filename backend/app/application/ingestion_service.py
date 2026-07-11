@@ -35,6 +35,7 @@ class IngestResult:
     title: str | None = None
     blocks: int = 0
     error: str | None = None
+    warning: str | None = None
 
     @property
     def changed(self) -> bool:
@@ -74,9 +75,16 @@ class IngestionService:
                 block_count = len(parsed.blocks)
                 title = record.title
                 status = IngestStatus.UPDATED if existing_hash else IngestStatus.IMPORTED
+                warning = (
+                    "This looks like a scanned PDF with little to no selectable text "
+                    "(OCR isn't supported yet) — the tutor and generated questions may "
+                    "be inaccurate for this file."
+                    if (parsed.metadata or {}).get("low_text_warning")
+                    else None
+                )
 
             logger.info("Ingested %s (%s, %d blocks)", path.name, status.value, block_count)
-            return IngestResult(path_str, status, title=title, blocks=block_count)
+            return IngestResult(path_str, status, title=title, blocks=block_count, warning=warning)
 
         except (ParserError, FileNotFoundError) as exc:
             logger.warning("Failed to ingest %s: %s", path, exc)
